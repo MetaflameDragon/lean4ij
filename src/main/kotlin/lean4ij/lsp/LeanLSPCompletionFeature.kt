@@ -7,6 +7,7 @@ import com.intellij.psi.util.startOffset
 import com.redhat.devtools.lsp4ij.client.features.LSPCompletionFeature
 import lean4ij.setting.Lean4Settings
 import org.eclipse.lsp4j.CompletionItem
+import org.eclipse.lsp4j.InsertReplaceEdit
 import org.eclipse.lsp4j.TextEdit
 import org.eclipse.lsp4j.jsonrpc.messages.Either
 
@@ -65,11 +66,16 @@ class LeanLSPCompletionFeature : LSPCompletionFeature() {
             val startPos = org.eclipse.lsp4j.Position(lineNum, elementStart - lineOffset)
             val endPos = org.eclipse.lsp4j.Position(lineNum, elementEnd - lineOffset)
 
-            val textEdit = TextEdit(
+            // Lean's LSP does not seem to accept TextEdits for CompletionItem.textEdit, only InsertReplaceEdits.
+            // Sending a TextEdit here causes it to fail to parse.
+            // Instead, this sends an InsertReplaceEdit with an empty replace range.
+            val textEdit = InsertReplaceEdit(
+                item.label,
                 org.eclipse.lsp4j.Range(startPos, endPos),
-                item.label
+                org.eclipse.lsp4j.Range(endPos, endPos),
             )
-            item.textEdit = Either.forLeft(textEdit)
+
+            item.textEdit = Either.forRight(textEdit)
         }
         return super.createLookupElement(item, context)
     }
