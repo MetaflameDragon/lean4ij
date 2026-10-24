@@ -19,6 +19,7 @@ import com.intellij.platform.ide.progress.withBackgroundProgress
 import com.intellij.platform.util.progress.ProgressReporter
 import com.intellij.platform.util.progress.reportProgress
 import com.intellij.platform.util.progress.withProgressText
+import fleet.util.Either
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +68,7 @@ import org.eclipse.lsp4j.jsonrpc.ResponseErrorException
 import java.nio.charset.StandardCharsets
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.reflect.full.memberFunctions
 
 
 class LeanFile(private val leanProjectService: LeanProjectService, private val file: String) {
@@ -519,7 +521,14 @@ class LeanFile(private val leanProjectService: LeanProjectService, private val f
             diagnosticsChannel.send(diagnostics.diagnostics)
         }
         for (d in diagnostics.diagnostics) {
-            buildWindowService.addBuildEvent(file, d.message)
+            // HACK calling d.message doesn't work due to a NoSuchMethodError for getMessage.
+            //   Calling getMessage() doesn't work either for some reason.
+            //   Finding the member function via reflection and calling _that_ does work, which is what this does.
+            //   To anyone reading this, please replace this with something more sane if you figure out a way to access .message properly.
+            @Suppress("UNCHECKED_CAST")
+            val invoke = d.javaClass.kotlin.memberFunctions.find { it.name == "getMessage" }?.call(d)
+                    as org.eclipse.lsp4j.jsonrpc.messages.Either<String, org.eclipse.lsp4j.MarkupContent>
+            buildWindowService.addBuildEvent(file, invoke.map({ it.toString() }, { it.toString() }))
         }
     }
 
